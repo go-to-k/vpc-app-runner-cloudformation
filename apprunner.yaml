@@ -1,0 +1,149 @@
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "ServiceName"
+        Parameters:
+          - ServiceName
+      - Label:
+          default: "VpcConnectorName"
+        Parameters:
+          - VpcConnectorName
+      - Label:
+          default: "SecurityGroupName"
+        Parameters:
+          - SecurityGroupName
+      - Label:
+          default: "SubnetID1"
+        Parameters:
+          - SubnetID1
+      - Label:
+          default: "SubnetID2"
+        Parameters:
+          - SubnetID2
+      - Label:
+          default: "VpcID"
+        Parameters:
+          - VpcID
+      - Label:
+          default: "CPU"
+        Parameters:
+          - CPU
+      - Label:
+          default: "Memory"
+        Parameters:
+          - Memory
+      - Label:
+          default: "AutoScalingConfigurationArn"
+        Parameters:
+          - AutoScalingConfigurationArn
+      - Label:
+          default: "ImageIdentifier"
+        Parameters:
+          - ImageIdentifier
+
+Parameters:
+  ServiceName:
+    Type: String
+  VpcConnectorName:
+    Type: String
+  SecurityGroupName:
+    Type: String
+  SubnetID1:
+    Type: String
+  SubnetID2:
+    Type: String
+  VpcID:
+    Type: String
+  CPU:
+    Type: String
+    AllowedPattern: "1024|2048|(1|2) vCPU"
+    Default: "1 vCPU"
+  Memory:
+    Type: String
+    AllowedPattern: "2048|3072|4096|(2|3|4) GB"
+    Default: "2 GB"
+  AutoScalingConfigurationArn:
+    Type: String
+  ImageIdentifier:
+    Type: String
+
+Resources:
+  AppRunnerAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+
+  AppRunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+
+  AppRunnerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      VpcId: !Ref VpcID
+      GroupName: !Ref SecurityGroupName
+      GroupDescription: "for App Runner"
+      Tags:
+        - Key: "Name"
+          Value: !Ref SecurityGroupName
+
+  VpcConnector:
+    Type: AWS::AppRunner::VpcConnector
+    Properties: 
+      VpcConnectorName: !Ref VpcConnectorName
+      Subnets: 
+        - !Ref SubnetID1
+        - !Ref SubnetID2
+      SecurityGroups:
+        - !Ref AppRunnerSecurityGroup
+
+  AppRunnerService:
+    Type: AWS::AppRunner::Service
+    Properties: 
+      AutoScalingConfigurationArn: !Ref AutoScalingConfigurationArn
+      # EncryptionConfiguration: # by default, App Runner uses an AWS managed key.
+      HealthCheckConfiguration:
+        Path: "/"
+        Protocol: "HTTP"
+        Interval: 5
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 2
+      InstanceConfiguration: 
+        Cpu: !Ref CPU
+        Memory: !Ref Memory
+        InstanceRoleArn: !GetAtt AppRunnerInstanceRole.Arn
+      NetworkConfiguration: 
+        EgressConfiguration: 
+          EgressType: VPC
+          VpcConnectorArn: !GetAtt VpcConnector.VpcConnectorArn
+      ServiceName: !Ref ServiceName
+      SourceConfiguration: 
+        AuthenticationConfiguration: 
+          AccessRoleArn: !GetAtt AppRunnerAccessRole.Arn
+          # ConnectionArn: # required for GitHub code repositories.
+        AutoDeploymentsEnabled: true
+        # CodeRepository: # required for GitHub code repositories.
+        ImageRepository: 
+          ImageRepositoryType: ECR
+          ImageIdentifier: !Ref ImageIdentifier
+          ImageConfiguration:
+            Port: 80
+            # RuntimeEnvironmentVariables:
+            # StartCommand:
