@@ -9,6 +9,7 @@ ServiceName="${StackName}"
 VpcConnectorName="${StackName}"
 SecurityGroupName="${StackName}"
 
+VpcID="vpc-*****************"
 SubnetID1="subnet-*****************"
 SubnetID2="subnet-*****************"
 
@@ -50,6 +51,7 @@ aws cloudformation deploy \
     ServiceName="${ServiceName}" \
     VpcConnectorName="${VpcConnectorName}" \
     SecurityGroupName="${SecurityGroupName}" \
+    VpcID="${VpcID}" \
     SubnetID1="${SubnetID1}" \
     SubnetID2="${SubnetID2}" \
     CPU="${CPU}" \
